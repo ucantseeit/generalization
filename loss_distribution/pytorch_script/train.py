@@ -16,6 +16,8 @@ from torch.utils.data.dataloader import default_collate
 from torchvision.transforms.functional import InterpolationMode
 from transforms import get_mixup_cutmix
 
+from utils import LeNet
+
 
 def train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema=None, scaler=None):
 	model.train()
@@ -212,60 +214,92 @@ def _load_imagenet_data(args):
 
 	return dataset, dataset_test, train_sampler, test_sampler
 
-# --- _load_cifar10_data 函数 ---
+
 # 不需要加载缓存，因为数据集较小
 def _load_cifar10_data(args):
-    print(f"Loading CIFAR10 data from {args.data_path}")
+	print(f"Loading CIFAR10 data from {args.data_path}")
 
-    use_v2 = args.use_v2
+	use_v2 = args.use_v2
 
-    st = time.time()
-    print("Start Downloading CIFAR10")
-    dataset_train = torchvision.datasets.CIFAR10(
-        root=args.data_path,
-        train=True,
-        download=TextTestRunner,
-        transform=presets.CIFAR10PresetTrain(use_v2=use_v2),
-    )
-    print("Took", time.time() - st)
-    st = time.time()
-    dataset_test = torchvision.datasets.CIFAR10(
-        root=args.data_path,
-        train=False,
-        download=True,
-        transform=presets.CIFAR10PresetEval(use_v2=use_v2),
-    )
-    print("Took", time.time() - st)
-    num_classes = 10
+	st = time.time()
+	print("Start Downloading CIFAR10")
+	dataset_train = torchvision.datasets.CIFAR10(
+		root=args.data_path,
+		train=True,
+		download=TextTestRunner,
+		transform=presets.CIFAR10PresetTrain(use_v2=use_v2),
+	)
+	print("Took", time.time() - st)
+	st = time.time()
+	dataset_test = torchvision.datasets.CIFAR10(
+		root=args.data_path,
+		train=False,
+		download=True,
+		transform=presets.CIFAR10PresetEval(use_v2=use_v2),
+	)
+	print("Took", time.time() - st)
+	num_classes = 10
 
-    return dataset_train, dataset_test, num_classes
+	return dataset_train, dataset_test, num_classes
+
+
+def _load_mnist_data(args):
+	print(f"Loading MNIST data from {args.data_path}")
+
+	use_v2 = args.use_v2
+
+	st = time.time()
+	print("Start Downloading MNIST train dataset")
+	dataset_train = torchvision.datasets.MNIST(
+		root=args.data_path,
+		train=True,
+		download=True, # Ensure download is set to True
+		transform=presets.MNISTPresetTrain(use_v2=use_v2),
+	)
+	print("Took", time.time() - st)
+	
+	st = time.time()
+	print("Start Downloading MNIST test dataset")
+	dataset_test = torchvision.datasets.MNIST(
+		root=args.data_path,
+		train=False,
+		download=True,
+		transform=presets.MNISTPresetEval(use_v2=use_v2),
+	)
+	print("Took", time.time() - st)
+	num_classes = 10 # MNIST has 10 classes
+
+	return dataset_train, dataset_test, num_classes
+
 
 def load_data(args):
-    dataset_train = None
-    dataset_test = None
-    num_classes = 0
+	dataset_train = None
+	dataset_test = None
+	num_classes = 0
 
-    if args.dataset_name.lower() == "imagenet":
-        dataset_train, dataset_test, num_classes = _load_imagenet_data(args)
-    elif args.dataset_name.lower() == "cifar10":
-        dataset_train, dataset_test, num_classes = _load_cifar10_data(args)
-    else:
-        raise ValueError(f"Unsupported dataset: {args.dataset_name}. Please choose from 'imagenet', 'cifar10'.")
+	if args.dataset_name.lower() == "imagenet":
+		dataset_train, dataset_test, num_classes = _load_imagenet_data(args)
+	elif args.dataset_name.lower() == "cifar10":
+		dataset_train, dataset_test, num_classes = _load_cifar10_data(args)
+	elif args.dataset_name.lower() == "mnist":
+		dataset_train, dataset_test, num_classes = _load_mnist_data(args)
+	else:
+		raise ValueError(f"Unsupported dataset: {args.dataset_name}. Please choose from 'imagenet', 'cifar10'.")
 
-    print("Creating data loaders")
-    # 采样器逻辑保持不变，因为它们通常与数据集类型无关，只与分布式设置有关
-    if args.distributed:
-        # 仅对 ImageNet 启用 RA Sampler，或者根据需要调整逻辑
-        if hasattr(args, "ra_sampler") and args.ra_sampler and args.dataset_name.lower() == "imagenet":
-            train_sampler = RASampler(dataset_train, shuffle=True, repetitions=args.ra_reps)
-        else:
-            train_sampler = torch.utils.data.distributed.DistributedSampler(dataset_train)
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, shuffle=False)
-    else:
-        train_sampler = torch.utils.data.RandomSampler(dataset_train)
-        test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+	print("Creating data loaders")
+	# 采样器逻辑保持不变，因为它们通常与数据集类型无关，只与分布式设置有关
+	if args.distributed:
+		# 仅对 ImageNet 启用 RA Sampler，或者根据需要调整逻辑
+		if hasattr(args, "ra_sampler") and args.ra_sampler and args.dataset_name.lower() == "imagenet":
+			train_sampler = RASampler(dataset_train, shuffle=True, repetitions=args.ra_reps)
+		else:
+			train_sampler = torch.utils.data.distributed.DistributedSampler(dataset_train)
+		test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, shuffle=False)
+	else:
+		train_sampler = torch.utils.data.RandomSampler(dataset_train)
+		test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    return dataset_train, dataset_test, train_sampler, test_sampler, num_classes
+	return dataset_train, dataset_test, train_sampler, test_sampler, num_classes
 
 
 def main(args):
@@ -285,7 +319,7 @@ def main(args):
 
 	dataset, dataset_test, train_sampler, test_sampler, num_classes = load_data(args)
 
-    # mixup_cutmix 逻辑
+	# mixup_cutmix 逻辑
 	mixup_cutmix = None
 	if args.mixup_alpha > 0 or args.cutmix_alpha > 0:
 		if args.dataset_name.lower() == "imagenet": # 仅对 ImageNet 启用 mixup/cutmix
@@ -314,9 +348,16 @@ def main(args):
 
 	# Create model
 	print("Creating model")
-    # 根据数据集类型决定是否加载预训练权重
-	use_weights = args.weights if args.dataset_name.lower() == "imagenet" else None
-	model = torchvision.models.get_model(args.model, weights=use_weights, num_classes=num_classes)
+	if args.model == "lenet":
+		# Determine in_channels for LeNet based on dataset
+		if args.dataset_name.lower() == "mnist":
+			in_channels = 1
+		else:
+			in_channels = 3
+		model = LeNet(num_classes=num_classes, in_channels=in_channels)
+	else:
+		use_weights = args.weights if args.dataset_name.lower() == "imagenet" else None
+		model = torchvision.models.get_model(args.model, weights=use_weights, num_classes=num_classes)
 
 	model.to(device)
 
@@ -472,7 +513,7 @@ def get_args_parser(add_help=True):
 	parser.add_argument("--model", default="resnet18", type=str, help="model name")
 	parser.add_argument(
 		"--dataset-name", default="cifar10", type=str,
-		choices=["imagenet", "cifar10"],
+		choices=["imagenet", "cifar10", "mnist"],
 		help="Name of the dataset to train (e.g., 'imagenet', 'cifar10'). Default: cifar10"
 	)
 	parser.add_argument(

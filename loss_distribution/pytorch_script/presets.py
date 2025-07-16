@@ -146,3 +146,31 @@ class CIFAR10PresetEval:
 
     def __call__(self, img):
         return self.transforms(img)
+
+
+# --- MNIST Specific Preset Classes ---
+class MNISTPresetTrain:
+    def __init__(self, use_v2=False):
+        T_module = get_module(use_v2)
+        self.transforms = T_module.Compose([
+            T_module.ToTensor(), # MNIST is grayscale, so ToTensor will convert to 1 channel
+            T_module.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
+            T_module.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
+            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x), # Ensure v2 outputs pure Tensor
+        ])
+
+    def __call__(self, img):
+        return self.transforms(img)
+
+class MNISTPresetEval:
+    def __init__(self, use_v2=False):
+        T_module = get_module(use_v2)
+        self.transforms = T_module.Compose([
+            T_module.ToTensor(),
+            T_module.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
+            T_module.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
+            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x),
+        ])
+
+    def __call__(self, img):
+        return self.transforms(img)

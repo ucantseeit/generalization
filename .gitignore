@@ -6,9 +6,9 @@ loss_distribution/model_training_results/**/*.pth
 # 通用数据目录
 loss_distribution/pytorch_script/data/
 
-# 可视化结果中的数据文件
-loss_distribution/visualize_results/cifar10_resnet18/*.npy
-loss_distribution/visualize_results/cifar10_resnet18/*.pickle
+# # 可视化结果中的数据文件
+# loss_distribution/visualize_results/cifar10_resnet18/*.npy
+# loss_distribution/visualize_results/cifar10_resnet18/*.pickle
 
 # 忽略 Python 缓存目录
 __pycache__/

@@ -462,3 +462,50 @@ def set_weight_decay(
         if len(params[key]) > 0:
             param_groups.append({"params": params[key], "weight_decay": params_weight_decay[key]})
     return param_groups
+
+
+import torch.nn as nn
+# Define LeNet model
+class LeNet(nn.Module):
+    def __init__(self, num_classes=10, in_channels=1): # Default to 1 channel for MNIST
+        super(LeNet, self).__init__()
+        # First convolutional layer
+        # Output size after conv1 (kernel 5, no padding, stride 1): (Input_H - 5 + 1) = Input_H - 4
+        # For 32x32 input -> 28x28
+        self.conv1 = nn.Conv2d(in_channels, 6, kernel_size=5)
+        self.relu1 = nn.ReLU()
+        # Output size after pool1 (kernel 2, stride 2): Input_H / 2
+        # For 28x28 input -> 14x14
+        self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2)
+
+        # Second convolutional layer
+        # Output size after conv2: (Input_H - 5 + 1) = Input_H - 4
+        # For 14x14 input -> 10x10
+        self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
+        self.relu2 = nn.ReLU()
+        # Output size after pool2: Input_H / 2
+        # For 10x10 input -> 5x5
+        self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2)
+
+        # Third convolutional layer (acting as fully connected to previous layer in original LeNet-5)
+        # For 5x5 input, conv3 (kernel 5, no padding, stride 1) -> 1x1 output
+        self.conv3 = nn.Conv2d(16, 120, kernel_size=5)
+        self.relu3 = nn.ReLU()
+
+        # Fully connected layers
+        # The input size to fc1 is 120 because conv3 (C5 layer) outputs 120 feature maps,
+        # each of size 1x1 (when the input to C5 is 5x5 as from S4 layer).
+        self.fc1 = nn.Linear(120, 84)
+        self.relu4 = nn.ReLU()
+        self.fc2 = nn.Linear(84, num_classes)
+
+    def forward(self, x):
+        x = self.pool1(self.relu1(self.conv1(x)))
+        x = self.pool2(self.relu2(self.conv2(x)))
+        x = self.relu3(self.conv3(x))
+        # Flatten the output of the last convolutional layer (conv3)
+        # Shape after conv3 is (batch_size, 120, 1, 1), flatten to (batch_size, 120)
+        x = torch.flatten(x, 1) # Flatten starting from dimension 1 (batch_size, channels*H*W)
+        x = self.relu4(self.fc1(x))
+        x = self.fc2(x)
+        return x

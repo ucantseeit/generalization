@@ -1,0 +1,8 @@
+python train.py \
+    --dataset-name mnist \
+    --model lenet \
+    --data-path data/mnist \
+    --epochs 10 \
+    --batch-size 128 \
+    --lr 0.01 \
+    --output-dir ../model_training_results/mnist_lenet

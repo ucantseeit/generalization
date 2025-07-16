@@ -3,7 +3,7 @@ python train.py \
     --dataset-name cifar10 \
     --data-path data/cifar10 \
     --model resnet18 \
-    --epochs 200 \
+    --epochs 400 \
     --batch-size 128 \
     --lr 0.1 \
     --wd 5e-4 \
