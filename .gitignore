@@ -1,0 +1,20 @@
+# 忽略模型文件
+loss_distribution/model_training_results/**/*.pth
+
+# 忽略数据目录和特定的数据文件
+
+# 通用数据目录
+loss_distribution/pytorch_script/data/
+
+# 可视化结果中的数据文件
+loss_distribution/visualize_results/cifar10_resnet18/*.npy
+loss_distribution/visualize_results/cifar10_resnet18/*.pickle
+
+# 忽略 Python 缓存目录
+__pycache__/
+
+# 忽略 VSCode 设置文件
+.vscode/
+
+# 忽略 .cph 文件（可能与 Competitive Programming Helper 或类似工具相关）
+.cph/

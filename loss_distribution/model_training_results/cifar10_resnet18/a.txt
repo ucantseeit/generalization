@@ -1,0 +1,16 @@
+python train.py \
+    --resume ../model_training_results/cifar10_resnet18/checkpoint.pth \
+    --dataset-name cifar10 \
+    --data-path data/cifar10 \
+    --model resnet18 \
+    --epochs 200 \
+    --batch-size 128 \
+    --lr 0.1 \
+    --wd 5e-4 \
+    --lr-scheduler cosineannealinglr \
+    --val-resize-size 32 \
+    --val-crop-size 32 \
+    --train-crop-size 32 \
+    --workers 4 \
+    --device cuda \
+    --output-dir ../model_training_results/cifar10_resnet18
