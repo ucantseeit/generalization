@@ -60,7 +60,7 @@ def delete_non_multiple_of_five_checkpoints(output_dir, start_epoch_inclusive=40
 if __name__ == "__main__":
     # 请将这里的 'your_output_directory_path' 替换为你的实际输出目录
     # 例如：'./cifar10_resnet18_output'
-    output_directory = './' # 替换为你的检查点目录
+    output_directory = '../model_training_results/cifar10_resnet18' # 替换为你的检查点目录
 
     # 删除从 model_40.pth 开始，所有非 5 的倍数的 epoch 文件
     # 例如，如果 model_40.pth 存在，但 model_41.pth, model_42.pth, model_43.pth, model_44.pth 存在，它们将被删除
