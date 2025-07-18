@@ -18,7 +18,7 @@ def delete_non_multiple_of_five_checkpoints(output_dir, start_epoch_inclusive=40
 
     # 正则表达式匹配 model_XXX.pth 格式
     # group(1) 会捕获 XXX 部分
-    pattern = re.compile(r"model_(\d{3})\.pth")
+    pattern = re.compile(r"model_(\d{2})\.pth")
 
     for filename in files_in_dir:
         match = pattern.match(filename)
@@ -60,13 +60,13 @@ def delete_non_multiple_of_five_checkpoints(output_dir, start_epoch_inclusive=40
 if __name__ == "__main__":
     # 请将这里的 'your_output_directory_path' 替换为你的实际输出目录
     # 例如：'./cifar10_resnet18_output'
-    output_directory = '../model_training_results/cifar10_resnet18' # 替换为你的检查点目录
+    output_directory = '../model_training_results/cifar10_resnet20' # 替换为你的检查点目录
 
     # 删除从 model_40.pth 开始，所有非 5 的倍数的 epoch 文件
     # 例如，如果 model_40.pth 存在，但 model_41.pth, model_42.pth, model_43.pth, model_44.pth 存在，它们将被删除
     # 而 model_45.pth 会被保留
     delete_non_multiple_of_five_checkpoints(
         output_dir=output_directory,
-        start_epoch_inclusive=40, # 从这个 epoch 开始检查
+        start_epoch_inclusive=0, # 从这个 epoch 开始检查
         save_multiple=10 # 保留 5 的倍数
     )

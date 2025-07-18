@@ -5,23 +5,8 @@ import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
+from pytorch_script.utils import get_model
 
-
-
-# 配置函数
-def load_config():
-	"""
-	加载并返回脚本的配置参数。
-	"""
-	config = {
-		'model_dir': '../../model_training_results/cifar10_resnet18',  # 模型存储的文件夹路径
-		'model_prefix': 'model_',        # 模型文件名的前缀
-		'model_extension': '.pth',                         # 保存模型的文件扩展名
-		'cifar10_data_path': '../../pytorch_script/data/cifar10',           # CIFAR-10 数据集存储路径
-		'batch_size': 64,                                 # DataLoader 的批次大小
-		'num_workers': 2                                  # DataLoader 的工作进程数
-	}
-	return config
 
 # 数据加载函数
 def load_cifar10_data(data_path, batch_size, num_workers):
@@ -49,22 +34,12 @@ def load_cifar10_data(data_path, batch_size, num_workers):
 		print(f"加载 CIFAR-10 数据集时发生错误：{e}")
 		print("请检查 CIFAR10_DATA_PATH 是否正确，并确保网络连接正常以便下载数据集。")
 		return None, None
-
-# 模型定义函数
-def get_resnet18_cifar10():
-	"""
-	返回一个为 CIFAR-10 任务定制的 ResNet-18 模型实例。
-	"""
-	model = torchvision.models.resnet18(weights=None) # 不加载预训练权重
-	# CIFAR-10 有 10 个类别，因此修改最后一层全连接层
-	num_ftrs = model.fc.in_features
-	model.fc = nn.Linear(num_ftrs, 10) # 10 是 CIFAR-10 的类别数
-	return model
+	
 
 # 模型加载函数
-def load_model_state_dict(model_path, device):
+def load_model_state_dict(ds_name, model_name, num_classes, model_path, device):
 	# 实例化模型并加载状态字典
-	model = get_resnet18_cifar10().to(device)
+	model = get_model(ds_name, model_name, weights=None, num_classes=num_classes)
 	
 	checkpoint = torch.load(model_path, map_location=device, weights_only=False)
 
@@ -88,10 +63,10 @@ def load_model_state_dict(model_path, device):
 
 
 # 模型评估函数
-def evaluate_model_performance(model_path, data_loader, device):
+def evaluate_model_performance(model, data_loader, device):
 	try:
-		model = load_model_state_dict(model_path, device)
 		model.eval() # 设置模型为评估模式
+		model.to(device)
 
 		correct = 0
 		total_loss = 0
@@ -114,7 +89,7 @@ def evaluate_model_performance(model_path, data_loader, device):
 		avg_loss = total_loss / total
 		return accuracy, avg_loss
 	except Exception as e:
-		print(f"评估模型 {model_path} 时发生错误：{e}")
+		print(f"评估模型 时发生错误：{e}")
 		return None
 
 # 模型文件管理函数

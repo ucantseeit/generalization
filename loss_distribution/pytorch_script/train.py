@@ -16,10 +16,10 @@ from torch.utils.data.dataloader import default_collate
 from torchvision.transforms.functional import InterpolationMode
 from transforms import get_mixup_cutmix
 
-from utils import LeNet
+from torch.utils.tensorboard import SummaryWriter
 
 
-def train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema=None, scaler=None):
+def train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema=None, scaler=None, writer=None):
 	model.train()
 	metric_logger = utils.MetricLogger(delimiter="  ")
 	metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
@@ -56,13 +56,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, arg
 
 		acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
 		batch_size = image.shape[0]
-		metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+		current_lr = optimizer.param_groups[0]["lr"]
+		metric_logger.update(loss=loss.item(), lr=current_lr)
 		metric_logger.meters["acc1"].update(acc1.item(), n=batch_size)
 		metric_logger.meters["acc5"].update(acc5.item(), n=batch_size)
 		metric_logger.meters["img/s"].update(batch_size / (time.time() - start_time))
 
+		if writer:
+			global_step = epoch * len(data_loader) + i
+			writer.add_scalar('Loss/Train_Step', loss.item(), global_step)
+			writer.add_scalar('Acc/Train_Step', acc1.item(), global_step)
+			writer.add_scalar('LearningRate/Train_Step', current_lr, global_step)
 
-def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix=""):
+
+def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix="", writer=None, epoch=0):
 	model.eval()
 	metric_logger = utils.MetricLogger(delimiter="  ")
 	header = f"Test: {log_suffix}"
@@ -102,6 +109,12 @@ def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix="
 	metric_logger.synchronize_between_processes()
 
 	print(f"{header} Acc@1 {metric_logger.acc1.global_avg:.3f} Acc@5 {metric_logger.acc5.global_avg:.3f}")
+
+	# 新增: TensorBoard 记录测试指标 (按 epoch 记录)
+	if writer:
+		writer.add_scalar(f'Loss/Test_Epoch{log_suffix}', metric_logger.loss.global_avg, epoch)
+		writer.add_scalar(f'Acc/Test_Epoch{log_suffix}', metric_logger.acc1.global_avg, epoch)
+	
 	return metric_logger.acc1.global_avg
 
 
@@ -230,6 +243,7 @@ def _load_cifar10_data(args):
 		transform=presets.CIFAR10PresetTrain(use_v2=use_v2),
 	)
 	print("Took", time.time() - st)
+
 	st = time.time()
 	dataset_test = torchvision.datasets.CIFAR10(
 		root=args.data_path,
@@ -319,6 +333,14 @@ def main(args):
 
 	dataset, dataset_test, train_sampler, test_sampler, num_classes = load_data(args)
 
+	# tensorboard逻辑
+	writer = None
+	if args.use_tensorboard:
+		log_dir = os.path.join(args.output_dir, "runs")
+		utils.mkdir(log_dir) # 确保 runs 目录存在
+		writer = SummaryWriter(log_dir=log_dir)
+		print(f"TensorBoard logs will be saved to: {log_dir}")
+
 	# mixup_cutmix 逻辑
 	mixup_cutmix = None
 	if args.mixup_alpha > 0 or args.cutmix_alpha > 0:
@@ -347,17 +369,20 @@ def main(args):
 	)
 
 	# Create model
-	print("Creating model")
-	if args.model == "lenet":
-		# Determine in_channels for LeNet based on dataset
-		if args.dataset_name.lower() == "mnist":
-			in_channels = 1
-		else:
-			in_channels = 3
-		model = LeNet(num_classes=num_classes, in_channels=in_channels)
-	else:
-		use_weights = args.weights if args.dataset_name.lower() == "imagenet" else None
-		model = torchvision.models.get_model(args.model, weights=use_weights, num_classes=num_classes)
+	# print("Creating model")
+	# if args.model == "lenet":
+	# 	# Determine in_channels for LeNet based on dataset
+	# 	if args.dataset_name.lower() == "mnist":
+	# 		in_channels = 1
+	# 	else:
+	# 		in_channels = 3
+	# 	model = LeNet(num_classes=num_classes, in_channels=in_channels)
+	# if args.model == 'resnet20':
+	# 	model = resnet20()
+	# else:
+	# 	use_weights = args.weights if args.dataset_name.lower() == "imagenet" else None
+	# 	model = torchvision.models.get_model(args.model, weights=use_weights, num_classes=num_classes)
+	model = utils.get_model(args.dataset_name, args.model, weights=None, num_classes=num_classes)
 
 	model.to(device)
 
@@ -379,6 +404,7 @@ def main(args):
 		custom_keys_weight_decay=custom_keys_weight_decay if len(custom_keys_weight_decay) > 0 else None,
 	)
 
+	# 优化器设置
 	opt_name = args.opt.lower()
 	if opt_name.startswith("sgd"):
 		optimizer = torch.optim.SGD(
@@ -399,6 +425,7 @@ def main(args):
 
 	scaler = torch.cuda.amp.GradScaler() if args.amp else None
 
+	# lr_scheduler设置
 	args.lr_scheduler = args.lr_scheduler.lower()
 	if args.lr_scheduler == "steplr":
 		main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
@@ -464,14 +491,18 @@ def main(args):
 		if scaler:
 			scaler.load_state_dict(checkpoint["scaler"])
 
+	# test_only
 	if args.test_only:
 		# We disable the cudnn benchmarking because it can noticeably affect the accuracy
 		torch.backends.cudnn.benchmark = False
 		torch.backends.cudnn.deterministic = True
 		if model_ema:
-			evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
+			evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA", writer=writer)
 		else:
-			evaluate(model, criterion, data_loader_test, device=device)
+			evaluate(model, criterion, data_loader_test, device=device, writer=writer)
+
+		if writer: # 新增：测试模式下也关闭writer
+			writer.close()
 		return
 
 	print("Start training")
@@ -479,11 +510,11 @@ def main(args):
 	for epoch in range(args.start_epoch, args.epochs):
 		if args.distributed:
 			train_sampler.set_epoch(epoch)
-		train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema, scaler)
+		train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema, scaler, writer=writer)
 		lr_scheduler.step()
-		evaluate(model, criterion, data_loader_test, device=device)
+		evaluate(model, criterion, data_loader_test, device=device, writer=writer, epoch=epoch)
 		if model_ema:
-			evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
+			evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA", writer=writer, epoch=epoch)
 		if args.output_dir:
 			checkpoint = {
 				"model": model_without_ddp.state_dict(),
@@ -540,6 +571,7 @@ def get_args_parser(add_help=True):
 	parser.add_argument(
 		"--use-deterministic-algorithms", action="store_true", help="Forces the use of deterministic algorithms only."
 	)
+	parser.add_argument("--use-tensorboard", action="store_true", help="Enable TensorBoard logging")
 	
 	# 数据预处理与数据增强
 	parser.add_argument(
