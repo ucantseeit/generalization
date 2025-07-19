@@ -1,0 +1,53 @@
+python train.py \
+	--dataset-name tinyimagenet \
+    --data-path data/tiny-imagenet-200 \
+    --model 'resnet18' \
+    --batch-size 256 \
+    --epochs 150 \
+    --opt 'sgd' \
+    --lr 0.2 \
+    --momentum 0.9 \
+    --weight-decay 1e-4 \
+    --lr-scheduler 'cosineannealinglr' \
+    --lr-warmup-epochs 5 \
+    --lr-warmup-method 'linear' \
+    --lr-warmup-decay 0.01 \
+	--use-tensorboard \
+    --output-dir ../model_training_results/tinyimagenet_resnet18  >  ../model_training_results/tinyimagenet_resnet18/output.log
+
+python train.py \
+	--resume ../model_training_results/tinyimagenet_resnet18/checkpoint.pth \
+	--dataset-name tinyimagenet \
+    --data-path data/tiny-imagenet-200 \
+    --model 'resnet18' \
+    --batch-size 256 \
+    --epochs 201 \
+    --opt 'sgd' \
+    --lr 0.2 \
+    --momentum 0.9 \
+    --weight-decay 1e-4 \
+    --lr-scheduler 'cosineannealinglr' \
+    --lr-warmup-epochs 5 \
+    --lr-warmup-method 'linear' \
+    --lr-warmup-decay 0.01 \
+	--use-tensorboard \
+    --output-dir ../model_training_results/tinyimagenet_resnet18  >  ../model_training_results/tinyimagenet_resnet18/output_continue.log
+
+
+python train.py \
+	--dataset-name tinyimagenet \
+    --data-path data/tiny-imagenet-200 \
+    --model 'resnet18' \
+    --batch-size 256 \
+    --opt 'sgd' \
+	--epochs 300 \
+    --lr 0.2 \
+    --lr-scheduler 'cosineannealinglr' \
+    --lr-min 1e-6 \
+    --lr-warmup-epochs 5 \
+    --lr-warmup-method 'linear' \
+    --lr-warmup-decay 0.01 \
+    --momentum 0.9 \
+    --weight-decay 1e-4 \
+	--use-tensorboard \
+    --output-dir ../model_training_results/tinyimagenet_resnet18  >  ../model_training_results/tinyimagenet_resnet18/output.log

@@ -2,16 +2,16 @@ import torch
 from torchvision.transforms.functional import InterpolationMode
 
 
-def get_module(use_v2):
-    # We need a protected import to avoid the V2 warning in case just V1 is used
-    if use_v2:
-        import torchvision.transforms.v2
+# def get_module(use_v2):
+#     # We need a protected import to avoid the V2 warning in case just V1 is used
+#     if use_v2:
+#         import torchvision.transforms.v2
 
-        return torchvision.transforms.v2
-    else:
-        import torchvision.transforms
+#         return torchvision.transforms.v2
+#     else:
+#         import torchvision.transforms
 
-        return torchvision.transforms
+#         return torchvision.transforms
 
 
 class ClassificationPresetTrain:
@@ -30,48 +30,45 @@ class ClassificationPresetTrain:
         ra_magnitude=9,
         augmix_severity=3,
         random_erase_prob=0.0,
-        backend="pil",
-        use_v2=False,
+        backend="pil"
     ):
-        T = get_module(use_v2)
 
         transforms = []
         backend = backend.lower()
         if backend == "tensor":
-            transforms.append(T.PILToTensor())
+            transforms.append(v2.PILToTensor())
         elif backend != "pil":
             raise ValueError(f"backend can be 'tensor' or 'pil', but got {backend}")
 
-        transforms.append(T.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True))
+        transforms.append(v2.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True))
         if hflip_prob > 0:
-            transforms.append(T.RandomHorizontalFlip(hflip_prob))
+            transforms.append(v2.RandomHorizontalFlip(hflip_prob))
         if auto_augment_policy is not None:
             if auto_augment_policy == "ra":
-                transforms.append(T.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
+                transforms.append(v2.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
             elif auto_augment_policy == "ta_wide":
-                transforms.append(T.TrivialAugmentWide(interpolation=interpolation))
+                transforms.append(v2.TrivialAugmentWide(interpolation=interpolation))
             elif auto_augment_policy == "augmix":
-                transforms.append(T.AugMix(interpolation=interpolation, severity=augmix_severity))
+                transforms.append(v2.AugMix(interpolation=interpolation, severity=augmix_severity))
             else:
-                aa_policy = T.AutoAugmentPolicy(auto_augment_policy)
-                transforms.append(T.AutoAugment(policy=aa_policy, interpolation=interpolation))
+                aa_policy = v2.AutoAugmentPolicy(auto_augment_policy)
+                transforms.append(v2.AutoAugment(policy=aa_policy, interpolation=interpolation))
 
         if backend == "pil":
-            transforms.append(T.PILToTensor())
+            transforms.append(v2.PILToTensor())
 
         transforms.extend(
             [
-                T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float),
-                T.Normalize(mean=mean, std=std),
+                v2.ToDtype(torch.float, scale=True),
+                v2.Normalize(mean=mean, std=std)
             ]
         )
         if random_erase_prob > 0:
-            transforms.append(T.RandomErasing(p=random_erase_prob))
+            transforms.append(v2.RandomErasing(p=random_erase_prob))
 
-        if use_v2:
-            transforms.append(T.ToPureTensor())
+        transforms.append(v2.ToPureTensor())
 
-        self.transforms = T.Compose(transforms)
+        self.transforms = v2.Compose(transforms)
 
     def __call__(self, img):
         return self.transforms(img)
@@ -86,62 +83,57 @@ class ClassificationPresetEval:
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
         interpolation=InterpolationMode.BILINEAR,
-        backend="pil",
-        use_v2=False,
+        backend="pil"
     ):
-        T = get_module(use_v2)
         transforms = []
         backend = backend.lower()
         if backend == "tensor":
-            transforms.append(T.PILToTensor())
+            transforms.append(v2.PILToTensor())
         elif backend != "pil":
             raise ValueError(f"backend can be 'tensor' or 'pil', but got {backend}")
 
         transforms += [
-            T.Resize(resize_size, interpolation=interpolation, antialias=True),
-            T.CenterCrop(crop_size),
+            v2.Resize(resize_size, interpolation=interpolation, antialias=True),
+            v2.CenterCrop(crop_size),
         ]
 
         if backend == "pil":
-            transforms.append(T.PILToTensor())
+            transforms.append(v2.PILToTensor())
 
         transforms += [
-            T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=mean, std=std),
+            v2.ToDtype(torch.float, scale=True),
+            v2.Normalize(mean=mean, std=std)
         ]
 
-        if use_v2:
-            transforms.append(T.ToPureTensor())
+        transforms.append(v2.ToPureTensor())
 
-        self.transforms = T.Compose(transforms)
+        self.transforms = v2.Compose(transforms)
 
     def __call__(self, img):
         return self.transforms(img)
 
 # --- 新增的 CIFAR10 专用预设类 ---
 class CIFAR10PresetTrain:
-    def __init__(self, use_v2=False):
-        T_module = get_module(use_v2)
-        self.transforms = T_module.Compose([
-            T_module.RandomCrop(32, padding=4),
-            T_module.RandomHorizontalFlip(),
-            T_module.PILToTensor(), # CIFAR10 原始数据通常是 PIL Image
-            T_module.ToDtype(torch.float, scale=True) if use_v2 else T_module.ConvertImageDtype(torch.float),
-            T_module.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)), # CIFAR10 均值和标准差
-            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x), # 确保 v2 输出纯 Tensor
+    def __init__(self):
+        self.transforms = v2.Compose([
+            v2.RandomCrop(32, padding=4),
+            v2.RandomHorizontalFlip(),
+            v2.PILToTensor(), # CIFAR10 原始数据通常是 PIL Image
+            v2.ToDtype(torch.float, scale=True),
+            v2.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)), # CIFAR10 均值和标准差
+            v2.ToPureTensor(), # 确保 v2 输出纯 Tensor
         ])
 
     def __call__(self, img):
         return self.transforms(img)
 
 class CIFAR10PresetEval:
-    def __init__(self, use_v2=False):
-        T_module = get_module(use_v2)
-        self.transforms = T_module.Compose([
-            T_module.PILToTensor(),
-            T_module.ToDtype(torch.float, scale=True) if use_v2 else T_module.ConvertImageDtype(torch.float),
-            T_module.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)), # CIFAR10 均值和标准差
-            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x),
+    def __init__(self):
+        self.transforms = v2.Compose([
+            v2.PILToTensor(),
+            v2.ToDtype(torch.float, scale=True),
+            v2.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)), # CIFAR10 均值和标准差
+            v2.ToPureTensor()
         ])
 
     def __call__(self, img):
@@ -150,26 +142,51 @@ class CIFAR10PresetEval:
 
 # --- MNIST Specific Preset Classes ---
 class MNISTPresetTrain:
-    def __init__(self, use_v2=False):
-        T_module = get_module(use_v2)
-        self.transforms = T_module.Compose([
-            T_module.ToTensor(), # MNIST is grayscale, so ToTensor will convert to 1 channel
-            T_module.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
-            T_module.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
-            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x), # Ensure v2 outputs pure Tensor
+    def __init__(self):
+        self.transforms = v2.Compose([
+            v2.ToTensor(), # MNIST is grayscale, so ToTensor will convert to 1 channel
+            v2.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
+            v2.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
+            v2.ToPureTensor(), # Ensure v2 outputs pure Tensor
         ])
 
     def __call__(self, img):
         return self.transforms(img)
 
 class MNISTPresetEval:
-    def __init__(self, use_v2=False):
-        T_module = get_module(use_v2)
-        self.transforms = T_module.Compose([
-            T_module.ToTensor(),
-            T_module.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
-            T_module.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
-            T_module.ToPureTensor() if use_v2 else T_module.Lambda(lambda x: x),
+    def __init__(self):
+        self.transforms = v2.Compose([
+            v2.ToTensor(),
+            v2.Pad(2), # Pad MNIST 28x28 to 32x32 for LeNet compatibility
+            v2.Normalize((0.1307,), (0.3081,)), # MNIST mean and std for 1 channel
+            v2.ToPureTensor(),
+        ])
+
+    def __call__(self, img):
+        return self.transforms(img)
+
+from torchvision.transforms import v2
+class TinyImageNetPresetTrain:
+    def __init__(self, *, crop_size=64, resize_size=64, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+        self.transforms = v2.Compose([
+            v2.RandomResizedCrop(crop_size),
+            v2.RandomHorizontalFlip(),
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=list(mean), std=list(std)),
+        ])
+
+    def __call__(self, img):
+        return self.transforms(img)
+
+class TinyImageNetPresetEval:
+    def __init__(self, *, crop_size=64, resize_size=64, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+        self.transforms = v2.Compose([
+            v2.Resize(resize_size),
+            v2.CenterCrop(crop_size),
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=list(mean), std=list(std)),
         ])
 
     def __call__(self, img):

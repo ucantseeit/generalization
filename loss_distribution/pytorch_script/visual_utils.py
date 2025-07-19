@@ -5,7 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
-from pytorch_script.utils import get_model
+from pytorch_script.models import get_model
 
 
 # 数据加载函数
@@ -58,6 +58,7 @@ def load_model_state_dict(ds_name, model_name, num_classes, model_path, device):
 		model_state_dict = checkpoint
 	
 	model.load_state_dict(model_state_dict)
+	print("提取成功")
 	return model
 
 
@@ -132,10 +133,12 @@ def plot_acc_losses(epochs, train_accuracies, test_accuracies, train_losses, tes
 	axes[0].set_title('Traning Accuraciess & Test Accuracies')
 	axes[0].set_xlabel('Epoch')
 	axes[0].set_ylabel('Accuracies')
+	axes[0].grid(True)
 
 	axes[1].set_title('Traning Losses & Test Losses')
 	axes[1].set_xlabel('Epoch')
-	axes[0].set_ylabel('Losses')
+	axes[1].set_ylabel('Losses')
+	axes[1].grid(True)
 
 def  plot_epochs_losses_distribution(ds_type : str, all_model_losses : dict, epochs):
 	'''

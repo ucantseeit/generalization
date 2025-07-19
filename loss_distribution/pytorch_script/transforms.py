@@ -2,31 +2,26 @@ import math
 from typing import Tuple
 
 import torch
-from presets import get_module
 from torch import Tensor
 from torchvision.transforms import functional as F
 
+import torchvision.transforms.v2 as v2
 
-def get_mixup_cutmix(*, mixup_alpha, cutmix_alpha, num_classes, use_v2):
-    transforms_module = get_module(use_v2)
 
+def get_mixup_cutmix(*, mixup_alpha, cutmix_alpha, num_classes):
     mixup_cutmix = []
     if mixup_alpha > 0:
         mixup_cutmix.append(
-            transforms_module.MixUp(alpha=mixup_alpha, num_classes=num_classes)
-            if use_v2
-            else RandomMixUp(num_classes=num_classes, p=1.0, alpha=mixup_alpha)
+            v2.MixUp(alpha=mixup_alpha, num_classes=num_classes)
         )
     if cutmix_alpha > 0:
         mixup_cutmix.append(
-            transforms_module.CutMix(alpha=cutmix_alpha, num_classes=num_classes)
-            if use_v2
-            else RandomCutMix(num_classes=num_classes, p=1.0, alpha=cutmix_alpha)
+            v2.CutMix(alpha=cutmix_alpha, num_classes=num_classes)
         )
     if not mixup_cutmix:
         return None
 
-    return transforms_module.RandomChoice(mixup_cutmix)
+    return v2.RandomChoice(mixup_cutmix)
 
 
 class RandomMixUp(torch.nn.Module):

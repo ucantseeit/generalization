@@ -16,5 +16,10 @@ __pycache__/
 # 忽略 VSCode 设置文件
 .vscode/
 
+# 忽略tensorboard
+**/runs/
+
+.log
+
 # 忽略 .cph 文件（可能与 Competitive Programming Helper 或类似工具相关）
 .cph/
