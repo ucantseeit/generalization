@@ -1,5 +1,6 @@
 # 忽略模型文件
 loss_distribution/model_training_results/**/*.pth
+loss_distribution/model_training_results/**/*.log
 
 # 忽略数据目录和特定的数据文件
 
@@ -19,7 +20,6 @@ __pycache__/
 # 忽略tensorboard
 **/runs/
 
-.log
 
 # 忽略 .cph 文件（可能与 Competitive Programming Helper 或类似工具相关）
 .cph/

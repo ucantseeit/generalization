@@ -5,7 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
-from pytorch_script.models import get_model
+from loss_distribution.pytorch_script.models import get_model
 
 
 # 数据加载函数
