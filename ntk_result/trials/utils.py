@@ -126,14 +126,14 @@ def compute_param_grads(model: nn.Module,
 	params = dict(model.named_parameters())
 	buffers = dict(model.named_buffers())
 
-	# 将 compute_single_gradient 定义为内部函数，以便访问 model
-	def compute_single_gradient(params, buffers, input, label):
+	# 将 compute_single_loss 定义为内部函数，以便访问 model
+	def compute_single_loss(params, buffers, input, label):
 		output = functional_call(model, (params, buffers), input.unsqueeze(0))
 		loss = loss_fn(output, label.unsqueeze(0))
 		return loss
 
 	# vmap 向量化 jacrev，用于批量计算
-	grads_fn = torch.func.grad(compute_single_gradient, argnums=0)
+	grads_fn = torch.func.grad(compute_single_loss, argnums=0)
 	vmap_grads_fn = torch.func.vmap(grads_fn, in_dims=(None, None, 0, 0))
 
 	inputs, labels = inputs.to(device), labels.to(device)
@@ -180,16 +180,24 @@ def find_topk_samples(
 	fn,
 	k=16,
 	batch_size=256,
+	reverse=False,
+	show_progress=True
 ):
 	
 	dl = DataLoader(ds, batch_size=batch_size, shuffle=False)
 
 	heap = []
 	idx_offset = 0
-	for batch in tqdm(dl):
+
+	iterator = tqdm(dl) if show_progress else dl
+	for batch in iterator:
 
 		batch_res = fn(batch)
-		batch_res_idx = [ (res, idx_offset+i) for i, res in enumerate(batch_res)]
+		if reverse:
+			# 取最小k个，先取负数，再存进堆
+			batch_res_idx = [(-res, idx_offset+i) for i, res in enumerate(batch_res)]
+		else:
+			batch_res_idx = [(res, idx_offset+i) for i, res in enumerate(batch_res)]
 
 		for res_idx in batch_res_idx:
 			if len(heap) < k:
@@ -199,7 +207,11 @@ def find_topk_samples(
 		
 		idx_offset += len(batch[0])
 
-	heap.sort(key=lambda x: x[0], reverse=True)
+	if reverse:
+		# 负数还原
+		heap = [(-res, idx) for res, idx in heap]
+
+	heap.sort(key=lambda x: x[0], reverse=not reverse)
 
 	return heap
 
