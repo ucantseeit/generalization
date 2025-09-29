@@ -113,28 +113,23 @@ def recover_cuda_after_oom():
 def compute_param_grads(model: nn.Module, 
 						inputs: torch.Tensor,
 						labels: torch.Tensor,
-						loss_fn = nn.CrossEntropyLoss(reduction='mean'),
 						device='cuda'):
-	"""
-	使用 torch.func.vmap 向量化地获取所有样本的梯度。
-	"""
-	loss_fn = loss_fn if loss_fn.reduction == 'mean' else type(loss_fn)(reduction='mean')
-
-	model.to(device)
-	model.eval()
+	model.to(device), model.eval()
 
 	params = dict(model.named_parameters())
 	buffers = dict(model.named_buffers())
 
-	# 将 compute_single_loss 定义为内部函数，以便访问 model
+	# 定义compute_single_loss函数
 	def compute_single_loss(params, buffers, input, label):
+		loss_fn = nn.CrossEntropyLoss(reduction='mean')
 		output = functional_call(model, (params, buffers), input.unsqueeze(0))
 		loss = loss_fn(output, label.unsqueeze(0))
 		return loss
 
-	# vmap 向量化 jacrev，用于批量计算
-	grads_fn = torch.func.grad(compute_single_loss, argnums=0)
-	vmap_grads_fn = torch.func.vmap(grads_fn, in_dims=(None, None, 0, 0))
+	# 将compute_single_loss函数转换为求梯度的函数grad_fn
+	grad_fn = torch.func.grad(compute_single_loss, argnums=0)
+	# 将grad_fn向量化成vmap_grads_fn
+	vmap_grads_fn = torch.func.vmap(grad_fn, in_dims=(None, None, 0, 0))
 
 	inputs, labels = inputs.to(device), labels.to(device)
 	
@@ -143,9 +138,7 @@ def compute_param_grads(model: nn.Module,
 	
 	flattened_grad = flatten_grads_dict(grads_per_sample_dict)
 	
-	# 释放缓存以防万一
 	torch.cuda.empty_cache()
-
 	return flattened_grad
 
 
@@ -240,13 +233,13 @@ def get_batch_grad_prod_fn(model,
 	ref_input = ref_input.to(device).unsqueeze(0)
 	ref_label = torch.tensor(ref_label).to(device).unsqueeze(0)
 
-	g_ref = compute_param_grads(model, ref_input, ref_label, loss_fn, device)[0]  # shape: [D]
+	g_ref = compute_param_grads(model, ref_input, ref_label, device)[0]  # shape: [D]
 
 	def f(batch):
 		inputs, labels = batch
 		inputs, labels = inputs.to(device), labels.to(device)
 
-		grads = compute_param_grads(model, inputs, labels, loss_fn, device)  # [B, D]
+		grads = compute_param_grads(model, inputs, labels, device)  # [B, D]
 
 		# 计算与参考样本梯度的内积，shape [B]
 		grad_inner_prods = grads @ g_ref
@@ -264,13 +257,13 @@ def get_batch_grad_cos_fn(model,
 	ref_input = ref_input.to(device).unsqueeze(0)
 	ref_label = torch.tensor(ref_label).to(device).unsqueeze(0)
 
-	g_ref = compute_param_grads(model, ref_input, ref_label, loss_fn, device)[0]  # shape: [D]
+	g_ref = compute_param_grads(model, ref_input, ref_label, device)[0]  # shape: [D]
 
 	def f(batch):
 		inputs, labels = batch
 		inputs, labels = inputs.to(device), labels.to(device)
 
-		grads = compute_param_grads(model, inputs, labels, loss_fn, device)  # [B, D]
+		grads = compute_param_grads(model, inputs, labels, device)  # [B, D]
 
 		# 计算与参考样本梯度的内积，shape [B]
 		batch_gradcos = F.cosine_similarity(grads, g_ref.unsqueeze(0), dim=1)
